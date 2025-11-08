@@ -1,0 +1,43 @@
+:root {
+  --bg:#05070B;
+  --panel:#0A0F1C;
+  --text:#dbeafe;
+  --muted:#94a3b8;
+  --cyan:#22d3ee;
+  --emerald:#34d399;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Only the canvas */
+.hero {
+  position: relative;
+  height: 100vh;
+}
+
+#three {
+  position: absolute;
+  inset: 0;
+}
+
+/* Hard-hide any leftover UI if it exists */
+.nav,
+.overlay,
+section.block,
+footer {
+  display: none !important;
+}
