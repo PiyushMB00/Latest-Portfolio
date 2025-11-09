@@ -15,11 +15,12 @@ renderer.setClearAlpha(0);
 mount.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enablePan = false;
 controls.enableDamping = true;
 controls.enableKeys = false;
 controls.minDistance = 6;
-controls.maxDistance = 200;
+controls.enableRotate = true;
+controls.enableZoom   = true;
+controls.enablePan    = false;
 
 const ambient = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(ambient);
@@ -75,7 +76,7 @@ function makeLabel(text) {
   return sp;
 }
 
-function makePlanet({ key, name, pos, color = 0x9ad7e0, ring = false, radius = 2.3, ringRadius}) {
+function makePlanet({ key, name, pos, color = 0x9ad7e0, ring = false, radius = 2.3, ringRadius }) {
   const geo = new THREE.SphereGeometry(radius, 64, 64);
   const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.15, roughness: 0.35, emissive: color, emissiveIntensity: 0.12 });
   const mesh = new THREE.Mesh(geo, mat);
@@ -85,8 +86,8 @@ function makePlanet({ key, name, pos, color = 0x9ad7e0, ring = false, radius = 2
   mesh.userData.key = key;
 
   if (ring) {
-      const r = new THREE.Mesh(
-      new THREE.TorusGeometry(ringRadius ?? radius * 2, 0.3, 16, 360),
+    const r = new THREE.Mesh(
+      new THREE.TorusGeometry(ringRadius ?? radius * 1.9, 0.2, 16, 360),
       new THREE.MeshStandardMaterial({ color: 0xe7fdff, emissive: 0xe7fdff, emissiveIntensity: 0.35, metalness: 0.8, roughness: 0.2 })
     );
     r.rotation.x = Math.PI / 2.2;
@@ -101,10 +102,10 @@ function makePlanet({ key, name, pos, color = 0x9ad7e0, ring = false, radius = 2
 
 const selectables = [];
 const PLANETS = [
-  { key: 'home', name: 'Home', pos: new THREE.Vector3(-45, 6, -70), ring: false,  color: 0xccbc3e3, radius: 4.5 },
-  { key: 'about', name: 'About', pos: new THREE.Vector3(58, 4, -37), ring: true, color: 0xcfde992, radius: 5, ringRadius: 7.0 },
-  { key: 'projects', name: 'Projects', pos: new THREE.Vector3(-50, 2, 55), ring: true, color: 0xcd3d3d3, radius: 2.8, ringRadius: 4.8 },
-  { key: 'contact', name: 'Contact', pos: new THREE.Vector3(65, -2, 42), ring: false, color: 0xcfbbf77, radius: 4 },
+  { key: 'home',     name: 'Home',     pos: new THREE.Vector3(-45,  6, -70), ring: false, color: 0xCCBC3E, radius: 4.5 },
+  { key: 'about',    name: 'About',    pos: new THREE.Vector3( 58,  4, -37), ring: true,  color: 0xFDE992, radius: 5.0, ringRadius: 7.0 },
+  { key: 'projects', name: 'Projects', pos: new THREE.Vector3(-50,  2,  55), ring: true,  color: 0xD3D3D3, radius: 2.8, ringRadius: 4.8 },
+  { key: 'contact',  name: 'Contact',  pos: new THREE.Vector3( 65, -2,  42), ring: false, color: 0xBBFF77, radius: 4.0 }
 ];
 
 const planetMeshes = {};
@@ -150,55 +151,75 @@ function resetMeteor(g, arr) {
 const meteors = Array.from({ length: 12 }, () => makeMeteor());
 meteors.forEach(m => scene.add(m.g));
 
-const panel = document.getElementById('panel');
-const panelTitle = document.getElementById('panel-title');
-const panelBody = document.getElementById('panel-content');
-const closeBtn = document.getElementById('close-panel');
-if (closeBtn) closeBtn.addEventListener('click', exitPlanet);
-window.addEventListener('keydown', e => { if (e.key === 'Escape') exitPlanet(); });
-
 let activeKey = null;
 
-function setPlanetsVisibility(onlyKey) {
-  selectables.forEach(obj => {
-    const isActive = obj.userData.key === onlyKey;
-    obj.visible = onlyKey ? isActive : true;
-  });
+function planetRadius(mesh) {
+  mesh.geometry.computeBoundingSphere();
+  const r = mesh.geometry.boundingSphere ? mesh.geometry.boundingSphere.radius : 1;
+  return r * mesh.scale.x;
+}
+
+function distanceToFill(planet, fill = 0.9) {
+  const r = planetRadius(planet);
+  return r / Math.tan((camera.fov * fill) * Math.PI / 360);
 }
 
 function enterPlanet(key) {
   if (!planetMeshes[key]) return;
+
   activeKey = key;
-  controls.enabled = false;
-  setPlanetsVisibility(key);
-  const target = planetMeshes[key].position.clone();
-  const toPos = target.clone().add(new THREE.Vector3(0, 0.4, 3.6));
-  tweenCamera({ toPos, toLook: target, ms: 1000, onDone: () => {
-    window.location.href = `${key}.html`;
-  }});
+  controls.enabled = true;
+
+  const planet = planetMeshes[key];
+  controls.target.copy(planet.position);
+
+  const r = planetRadius(planet);
+  const dist = camera.position.distanceTo(planet.position);
+  const ang = 2 * Math.atan(r / dist);
+  const finalFovDeg = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(ang) * 0.85, 5, camera.fov);
+
+  animateFov(camera.fov, finalFovDeg, 600, () => {
+    flash.style.transition = 'opacity 120ms ease';
+    flash.style.opacity = '1';
+    setTimeout(() => { window.location.href = `${key}.html`; }, 500);
+  });
+}
+
+function flyNoRotate({ to, ms = 7000, onDone }) {
+  const from = camera.position.clone();
+  let t = 0, dur = Math.max(1, ms);
+  const ease = x => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+  function step() {
+    t += 16;
+    const k = Math.min(1, t / dur);
+    const e = ease(k);
+    camera.position.lerpVectors(from, to, e);
+    if (k < 1) requestAnimationFrame(step);
+    else onDone && onDone();
+  }
+  requestAnimationFrame(step);
 }
 
 function exitPlanet() {
   if (!activeKey) return;
   activeKey = null;
-  hidePanel();
-  setPlanetsVisibility(null);
-  tweenCamera({ toPos: CAMERA_HOME, toLook: new THREE.Vector3(0,0,0), ms: 900, onDone: () => { controls.enabled = true; } });
+  tweenPosition({ toPos: CAMERA_HOME, ms: 900, onDone: () => { controls.enabled = true; } });
 }
 
-function tweenCamera({ toPos, toLook, ms = 800, onDone }) {
+function tweenPosition({ toPos, ms = 800, onDone }) {
   const fromPos = camera.position.clone();
-  const fromLook = new THREE.Vector3();
-  camera.getWorldDirection(fromLook);
-  const lookPoint = camera.position.clone().add(fromLook);
+  const FIXED_QUAT = camera.quaternion.clone();
   let t = 0; const dur = Math.max(1, ms);
-  function easeInOut(x){ return x<0.5 ? 2*x*x : 1 - Math.pow(-2*x + 2, 2)/2; }
+  function ease(x){ return x<0.5 ? 2*x*x : 1 - Math.pow(-2*x + 2, 2)/2; }
   function step() {
-    t += 16; const k = Math.min(1, t/dur); const e = easeInOut(k);
+    t += 16;
+    const k = Math.min(1, t/dur);
+    const e = ease(k);
     camera.position.lerpVectors(fromPos, toPos, e);
-    const curLook = new THREE.Vector3().lerpVectors(lookPoint, toLook, e);
-    camera.lookAt(curLook);
-    if (k < 1) requestAnimationFrame(step); else onDone && onDone();
+    camera.quaternion.copy(FIXED_QUAT);
+    camera.updateMatrixWorld(true);
+    if (k < 1) requestAnimationFrame(step);
+    else onDone && onDone();
   }
   requestAnimationFrame(step);
 }
@@ -217,9 +238,17 @@ window.addEventListener('click', () => {
   if (hit && hit.object.userData.type === 'planet') enterPlanet(hit.object.userData.key);
 });
 
-const keys = { w:false, a:false, s:false, d:false, q:false, e:false };
-window.addEventListener('keydown', e => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
-window.addEventListener('keyup',   e => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+const keys = { w:false, a:false, s:false, d:false, q:false, e:false, shift:false };
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (keys.hasOwnProperty(k)) keys[k] = true;
+  if (k === 'shift') keys.shift = true;
+});
+window.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (keys.hasOwnProperty(k)) keys[k] = false;
+  if (k === 'shift') keys.shift = false;
+});
 
 function onResize() {
   const { clientWidth, clientHeight } = mount;
@@ -233,21 +262,7 @@ onResize();
 let last = performance.now();
 function animate(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now;
-  group.rotation.y += dt * 0.02;
-
-  if (!activeKey) {
-    const dirVec = new THREE.Vector3();
-    camera.getWorldDirection(dirVec);
-    dirVec.y = 0; dirVec.normalize();
-    const right = new THREE.Vector3().crossVectors(dirVec, new THREE.Vector3(0,1,0)).normalize();
-    const speed = (keys.shiftKey ? 50 : 20) * dt; // hold Shift for faster
-    if (keys.w) camera.position.addScaledVector(dirVec,  speed);
-    if (keys.s) camera.position.addScaledVector(dirVec, -speed);
-    if (keys.a) camera.position.addScaledVector(right,  -speed);
-    if (keys.d) camera.position.addScaledVector(right,   speed);
-    if (keys.q) camera.position.y -= speed;
-    if (keys.e) camera.position.y += speed;
-  }
+  group.rotation.y += activeKey ? 0 : dt * 0.02;
 
   controls.update();
 
@@ -270,3 +285,38 @@ function animate(now) {
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
+
+const flash = document.createElement('div');
+Object.assign(flash.style, {
+  position: 'fixed', inset: '0', background: '#fff',
+  opacity: '0', pointerEvents: 'none', transition: 'opacity 160ms ease'
+});
+document.body.appendChild(flash);
+
+function triggerFlash(duration = 500, done) {
+  flash.style.opacity = '1';
+  setTimeout(() => {
+    if (typeof done === 'function') done();
+    setTimeout(() => { flash.style.opacity = '0'; }, 80);
+  }, duration);
+}
+
+function flashAndGo(url){
+  const el = document.getElementById('flash');
+  if(!el){ window.location.href = url; return; }
+  el.style.opacity = '1';
+  setTimeout(()=> { window.location.href = url; }, 500);
+}
+
+function animateFov(from, to, ms = 600, onDone) {
+  const start = performance.now();
+  function ease(x){ return x < 0.5 ? 2*x*x : 1 - Math.pow(-2*x + 2, 2)/2; }
+  function tick(now){
+    const k = Math.min(1, (now - start) / ms);
+    const e = ease(k);
+    camera.fov = from + (to - from) * e;
+    camera.updateProjectionMatrix();
+    if (k < 1) requestAnimationFrame(tick); else onDone && onDone();
+  }
+  requestAnimationFrame(tick);
+}

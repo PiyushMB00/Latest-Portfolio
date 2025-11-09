@@ -41,3 +41,18 @@ section.block,
 footer {
   display: none !important;
 }
+
+/* Full-screen white flash for page transition */
+/* white flash overlay */
+#flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease; /* 250ms flash */
+}
+
+
+/* if you see stripy lines, nuke any accidental scanline/gradient overlays */
+body::before, .hero::before { content: none !important; display: none !important; }
