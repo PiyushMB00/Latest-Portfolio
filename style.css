@@ -56,3 +56,4 @@ footer {
 
 /* if you see stripy lines, nuke any accidental scanline/gradient overlays */
 body::before, .hero::before { content: none !important; display: none !important; }
+

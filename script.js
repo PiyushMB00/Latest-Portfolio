@@ -102,10 +102,10 @@ function makePlanet({ key, name, pos, color = 0x9ad7e0, ring = false, radius = 2
 
 const selectables = [];
 const PLANETS = [
-  { key: 'home',     name: 'Home',     pos: new THREE.Vector3(-45,  6, -70), ring: false, color: 0xCCBC3E, radius: 4.5 },
-  { key: 'about',    name: 'About',    pos: new THREE.Vector3( 58,  4, -37), ring: true,  color: 0xFDE992, radius: 5.0, ringRadius: 7.0 },
-  { key: 'projects', name: 'Projects', pos: new THREE.Vector3(-50,  2,  55), ring: true,  color: 0xD3D3D3, radius: 2.8, ringRadius: 4.8 },
-  { key: 'contact',  name: 'Contact',  pos: new THREE.Vector3( 65, -2,  42), ring: false, color: 0xBBFF77, radius: 4.0 }
+  { key: 'home',     name: 'Home',     pos: new THREE.Vector3(-45,  6, -70), ring: false, color: 0xCCBC3E, radius: 7 },
+  { key: 'about',    name: 'About',    pos: new THREE.Vector3( 58,  4, -37), ring: true,  color: 0xFDE992, radius: 8, ringRadius: 12 },
+  { key: 'projects', name: 'Projects', pos: new THREE.Vector3(-50,  2,  55), ring: true,  color: 0xD3D3D3, radius: 5, ringRadius: 7 },
+  { key: 'contact',  name: 'Contact',  pos: new THREE.Vector3( 65, -2,  42), ring: false, color: 0xBBFF77, radius: 6 }
 ];
 
 const planetMeshes = {};
